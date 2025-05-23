@@ -48,8 +48,9 @@ const uint32_t MAX_SUPPORTED_PARTICIPANTS = 31;
 uvgrtp::rtcp::rtcp(std::shared_ptr<uvgrtp::rtp> rtp, std::shared_ptr<std::atomic_uint> ssrc, std::shared_ptr<std::atomic<uint32_t>> remote_ssrc,
     std::string cname, std::shared_ptr<uvgrtp::socketfactory> sfp, int rce_flags) :
     rce_flags_(rce_flags), our_role_(RECEIVER),
-    tp_(0), tc_(0), tn_(0), pmembers_(0),
-    members_(0), senders_(0), rtcp_bandwidth_(0), reduced_minimum_(0),
+    tp_(0), tc_(0), tn_(0), 
+    pmembers_(0), members_(0), senders_(0), 
+    total_bandwidth_(0), rtcp_bandwidth_(0), reduced_minimum_(0),
     we_sent_(false), local_addr_(""), remote_addr_(""), local_port_(0), dst_port_(0),
     avg_rtcp_pkt_pize_(0), avg_rtcp_size_(64), rtcp_pkt_count_(0), rtcp_byte_count_(0),
     rtcp_pkt_sent_count_(0), initial_(true), ssrc_(ssrc), remote_ssrc_(remote_ssrc),
@@ -1659,6 +1660,11 @@ rtp_error_t uvgrtp::rtcp::handle_fb_packet(uint8_t* packet, size_t& read_ptr,
     if (fb_hook_u_) {
         fb_hook_u_(std::unique_ptr<uvgrtp::frame::rtcp_fb_packet>(frame));
     }
+    else
+    {
+        UVG_LOG_WARN("Discarding received RTCP PSFB packet without a hook");
+        delete frame;
+    }
     fb_mutex_.unlock();
     return RTP_OK;
 }
@@ -1859,6 +1865,7 @@ rtp_error_t uvgrtp::rtcp::generate_report()
             !construct_sender_info(frame, write_ptr, ntp_ts, reporting_rtp_ts, our_stats.sent_pkts, our_stats.sent_bytes))
         {
             UVG_LOG_ERROR("Failed to construct SR");
+            delete[] frame;
             return RTP_GENERIC_ERROR;
         }
 
@@ -1872,6 +1879,7 @@ rtp_error_t uvgrtp::rtcp::generate_report()
             !construct_ssrc(frame, write_ptr, ssrc))
         {
             UVG_LOG_ERROR("Failed to construct RR");
+            delete[] frame;
             return RTP_GENERIC_ERROR;
         }
     }

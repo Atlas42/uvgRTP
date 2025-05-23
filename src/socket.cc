@@ -248,11 +248,10 @@ rtp_error_t uvgrtp::socket::bind_ip6(sockaddr_in6& local_address)
     return RTP_OK;
 }
 
-int uvgrtp::socket::check_family(std::string addr) 
+int uvgrtp::socket::check_family(std::string addr)
 {
-    // Use getaddrinfo() to determine whether we are using ipv4 or ipv6 addresses
     struct addrinfo hint, * res = NULL;
-    memset(&hint, '\0', sizeof(hint));
+    memset(&hint, 0, sizeof(hint));
     hint.ai_family = PF_UNSPEC;
     hint.ai_flags = AI_NUMERICHOST;
 
@@ -260,15 +259,19 @@ int uvgrtp::socket::check_family(std::string addr)
         UVG_LOG_ERROR("Invalid IP address");
         return RTP_GENERIC_ERROR;
     }
+
+    int family = -1;  // Default return value
     if (res->ai_family == AF_INET6) {
         UVG_LOG_DEBUG("Using an IPv6 address");
-        return 2;
+        family = 2;
     }
     else {
         UVG_LOG_DEBUG("Using an IPv4 address");
-        return 1;
+        family = 1;
     }
-    return -1;
+
+    freeaddrinfo(res);  // Free allocated memory
+    return family;
 }
 
 sockaddr_in uvgrtp::socket::create_sockaddr(short family, unsigned host, short port)
@@ -367,6 +370,7 @@ std::string uvgrtp::socket::sockaddr_to_string(const sockaddr_in& addr)
     std::string string(addr_string);
     string.append(":" + std::to_string(ntohs(addr.sin_port)));
 
+    delete[] c_string;
     delete[] addr_string;
     return string;
 }
@@ -856,13 +860,11 @@ rtp_error_t uvgrtp::socket::recv(uint8_t *buf, size_t buf_len, int recv_flags, i
 
 rtp_error_t uvgrtp::socket::__recvfrom(uint8_t *buf, size_t buf_len, int recv_flags, sockaddr_in *sender, int *bytes_read)
 {
-    socklen_t *len_ptr = nullptr;
     socklen_t len      = sizeof(sockaddr_in);
-
-    if (sender)
-        len_ptr = &len;
-
+    
 #ifndef _WIN32
+    socklen_t* len_ptr = &len;
+
     int32_t ret = ::recvfrom(socket_, buf, buf_len, recv_flags, (struct sockaddr *)sender, len_ptr);
 
     if (ret == -1) {
@@ -878,6 +880,10 @@ rtp_error_t uvgrtp::socket::__recvfrom(uint8_t *buf, size_t buf_len, int recv_fl
 
     set_bytes(bytes_read, ret);
 #else
+    socklen_t* len_ptr = nullptr;
+
+    if (sender)
+        len_ptr = &len;
 
     (void)recv_flags;
 
@@ -911,13 +917,10 @@ rtp_error_t uvgrtp::socket::__recvfrom(uint8_t *buf, size_t buf_len, int recv_fl
 
 rtp_error_t uvgrtp::socket::__recvfrom_ip6(uint8_t* buf, size_t buf_len, int recv_flags, sockaddr_in6* sender, int* bytes_read)
 {
-    socklen_t* len_ptr = nullptr;
     socklen_t len = sizeof(sockaddr_in6);
 
-    if (sender)
-        len_ptr = &len;
-
 #ifndef _WIN32
+    socklen_t* len_ptr = &len;
     int32_t ret = ::recvfrom(socket_, buf, buf_len, recv_flags, (struct sockaddr*)sender, len_ptr);
 
     if (ret == -1) {
@@ -933,6 +936,11 @@ rtp_error_t uvgrtp::socket::__recvfrom_ip6(uint8_t* buf, size_t buf_len, int rec
 
     set_bytes(bytes_read, ret);
 #else
+
+    socklen_t* len_ptr = nullptr;
+
+    if (sender)
+        len_ptr = &len;
 
     (void)recv_flags;
 
